@@ -1,120 +1,202 @@
-FT.com Article Scraper
-This project is a Node.js-based web scraper for extracting articles from the Financial Times (FT.com) using Puppeteer. It fetches article URLs from FT's RSS feeds, scrapes content in parallel using a "swarm" approach, bypasses Cloudflare and paywall protections, and stores data in MongoDB, JSON, and CSV formats. The scraper runs daily via a cron scheduler.
-⚠️ Legal Notice: Web scraping may violate FT.com's terms of service, copyright laws, or anti-bot protections. This project is for educational purposes only. Ensure compliance with applicable laws and FT.com's terms before use. Consider using FT's official API or licensed data feeds as alternatives. Use at your own risk.
-Features
+# Financial Times News Scraper
 
-Fetches article URLs from FT.com RSS feeds (e.g., World and Companies sections).
-Scrapes article title, body, date, and author using Puppeteer with stealth plugins.
-Bypasses Cloudflare using FlareSolverr and proxy rotation.
-Attempts paywall bypass with referrer spoofing and bypass-paywalls-chrome extension.
-Parallel scraping with configurable concurrency using puppeteer-cluster.
-Stores data in MongoDB, JSON, and CSV with deduplication.
-Schedules daily runs at midnight UTC using node-cron.
-Includes retry logic and error logging for robustness.
+Un scraper automatisé pour extraire et sauvegarder les articles du Financial Times à partir de leurs flux RSS. Le système utilise une approche de "swarm scraping" pour traiter plusieurs articles en parallèle tout en évitant la détection.
 
-Prerequisites
+## 📋 Fonctionnalités
 
-Node.js: v18 or higher.
-MongoDB: Local or cloud instance (e.g., MongoDB Atlas).
-Docker: For running FlareSolverr.
-Proxy Service: Rotating proxies (e.g., Bright Data, Oxylabs) to avoid IP bans.
-bypass-paywalls-chrome: Browser extension for paywall bypass.
+- **Scraping RSS** : Extraction automatique des URLs d'articles depuis les flux RSS du FT
+- **Scraping parallèle** : Traitement concurrent de plusieurs articles pour optimiser la vitesse
+- **Anti-détection** : Utilisation de Puppeteer Stealth et rotation d'user-agents
+- **Gestion des paywalls** : Tentative de contournement des overlays de paywall
+- **Sauvegarde multiple** : Export en JSON et CSV avec détection des doublons
+- **Planification** : Exécution automatique quotidienne via cron
+- **Gestion d'erreurs** : Retry automatique et logging des erreurs
 
-Installation
+## 🔧 Dépendances
 
-Clone the repository:
-git clone https://github.com/your-username/ft-scraper.git
-cd ft-scraper
+### Dependencies principales
+```json
+{
+  "puppeteer-extra": "^3.3.6",
+  "puppeteer-extra-plugin-stealth": "^2.11.2",
+  "rss-parser": "^3.13.0",
+  "mongodb": "^6.0.0",
+  "csv-writer": "^1.6.0",
+  "node-cron": "^3.0.3"
+}
+```
 
+### Installation
+```bash
+npm install puppeteer-extra puppeteer-extra-plugin-stealth rss-parser mongodb csv-writer node-cron
+```
 
-Install dependencies:
-npm install puppeteer-extra puppeteer-extra-plugin-stealth puppeteer-cluster rss-parser mongoose axios dotenv csv-writer node-cron
+## 🏗️ Architecture et Fonctions
 
+### 1. Configuration (`config`)
+```javascript
+const config = {
+  feedUrls: ['https://www.ft.com/world?format=rss', 'https://www.ft.com/companies?format=rss'],
+  maxConcurrent: 5,
+  limit: 20,
+  proxies: [null],
+  userAgents: [...]
+}
+```
+**Intérêt** : Centralise tous les paramètres configurables (flux RSS, limite de concurrence, proxies, user-agents) pour faciliter la maintenance et les ajustements.
 
-Set up FlareSolverr:
-docker run -d -p 8191:8191 flaresolverr/flaresolverr
+### 2. Lancement du navigateur (`launchBrowser`)
+```javascript
+async function launchBrowser(proxy = null)
+```
+**Étapes de traitement** :
+- Sélection aléatoire d'un user-agent
+- Configuration des arguments Puppeteer (sandbox, proxy)
+- Lancement en mode headless
 
-Verify it’s running with docker ps.
+**Intérêt** : Initialise un navigateur configuré pour éviter la détection avec rotation d'user-agents et support proxy.
 
-Download bypass-paywalls-chrome:
+### 3. Scraping d'article (`scrapeArticle`)
+```javascript
+async function scrapeArticle(page, url, retries = 2)
+```
+**Étapes de traitement** :
+1. Navigation vers l'URL avec timeout
+2. Suppression des éléments de paywall via JavaScript
+3. Attente pour le chargement du contenu
+4. Extraction des données (titre, corps, date, auteur)
+5. Retry automatique en cas d'échec
 
-Clone or download from iamadamdev/bypass-paywalls-chrome.
-Unzip and update the extensionPath in swarm-scraper.js to the extension folder path.
+**Intérêt** : Fonction core qui extrait le contenu d'un article en gérant les obstacles (paywall, timeouts) avec un système de retry robuste.
 
+### 4. Récupération des URLs (`getArticleUrls`)
+```javascript
+async function getArticleUrls(feeds = config.feedUrls, limit = config.limit)
+```
+**Étapes de traitement** :
+1. Parse de chaque flux RSS
+2. Filtrage des articles du jour uniquement
+3. Limitation du nombre d'articles par flux
+4. Déduplication des URLs
 
-Configure environment variables:Create a .env file in the project root:
-MONGO_URL=mongodb://localhost:27017
-PROXY_URLS=http://user:pass@proxy1:port,http://user:pass@proxy2:port
+**Intérêt** : Collecte intelligente des URLs à scraper en se concentrant sur le contenu récent et en évitant les doublons.
 
+### 5. Sauvegarde JSON (`saveToJson`)
+```javascript
+async function saveToJson(articles)
+```
+**Étapes de traitement** :
+1. Lecture du fichier JSON existant
+2. Détection des articles déjà présents via URL
+3. Ajout uniquement des nouveaux articles
+4. Sauvegarde avec formatage
 
-Replace MONGO_URL with your MongoDB connection string.
-Add proxy URLs from your proxy service (optional but recommended).
+**Intérêt** : Maintient un historique complet en JSON tout en évitant la duplication de données.
 
+### 6. Sauvegarde CSV (`saveToCsv`)
+```javascript
+async function saveToCsv(articles)
+```
+**Étapes de traitement** :
+1. Configuration du writer CSV avec headers
+2. Lecture du CSV existant pour détecter les doublons
+3. Append des nouveaux articles uniquement
 
-Set up MongoDB:
+**Intérêt** : Format CSV pour l'analyse de données et l'import dans des outils externes (Excel, BI tools).
 
-Install MongoDB locally or use a cloud instance.
-Ensure the ft_articles database is accessible.
+### 7. Scraping en essaim (`swarmScrape`)
+```javascript
+async function swarmScrape()
+```
+**Étapes de traitement** :
+1. Lancement du navigateur avec proxy aléatoire
+2. Récupération de la liste des URLs à scraper
+3. Traitement par batches concurrents
+4. Création de pages multiples pour le parallélisme
+5. Exécution simultanée des scraping d'articles
+6. Fermeture propre des pages et du navigateur
+7. Sauvegarde des résultats
 
+**Intérêt** : Orchestration complète du processus avec optimisation des performances via le traitement parallèle tout en respectant les limites du serveur.
 
+## 🚀 Utilisation
 
-Usage
+### Exécution manuelle
+```bash
+node scraper.js
+```
 
-Run the scraper manually:
-node swarm-scraper.js
+### Avec planificateur (recommandé)
+```bash
+node scheduler.js
+```
+Le planificateur exécute le scraper quotidiennement à minuit UTC.
 
-This scrapes up to 20 articles from FT.com RSS feeds, saves them to MongoDB, articles.json, and articles.csv, and logs errors to errors.log.
+## 📁 Structure des données
 
-Check output:
+### Format JSON
+```json
+{
+  "url": "https://www.ft.com/content/...",
+  "title": "Article Title",
+  "body": "Full article content...",
+  "date": "Published date",
+  "author": "Author name"
+}
+```
 
-MongoDB: Connect to ft_articles database and query db.articles.find().
-JSON: Check articles.json for raw data.
-CSV: Check articles.csv for tabular data.
-Logs: Review errors.log for issues.
+### Format CSV
+```csv
+URL,Title,Body,Date,Author
+https://www.ft.com/content/...,Article Title,Full content...,Date,Author
+```
 
+## ⚙️ Configuration avancée
 
-Scheduler:
+### Ajout de proxies
+```javascript
+proxies: [
+  'http://user:pass@proxy1:8080',
+  'http://user:pass@proxy2:8080',
+  null // Direct connection
+]
+```
 
-The script includes a cron job that runs daily at midnight UTC.
-Start the scheduler with:node swarm-scraper.js
+### Modification des flux RSS
+```javascript
+feedUrls: [
+  'https://www.ft.com/world?format=rss',
+  'https://www.ft.com/companies?format=rss',
+  'https://www.ft.com/markets?format=rss'
+]
+```
 
+### Ajustement de la concurrence
+```javascript
+maxConcurrent: 3 // Réduire pour des sites plus sensibles
+```
 
-To run in the background, use a process manager like PM2:npm install -g pm2
-pm2 start swarm-scraper.js --name ft-scraper
+## 📝 Logs et monitoring
 
+- Logs de progression en temps réel
+- Sauvegarde des erreurs dans `errors.log`
+- Compteurs de nouveaux articles sauvegardés
+- Retry automatique avec logging des tentatives
 
+## ⚠️ Avertissements
 
+- Respectez les conditions d'utilisation du Financial Times
+- Utilisez des délais appropriés pour éviter la surcharge des serveurs
+- Testez avec des limites faibles avant le déploiement en production
+- Le contournement de paywall peut violer les ToS du site
 
+## 🔍 Troubleshooting
 
-Configuration
-Edit the config object in swarm-scraper.js:
+**Problème** : `waitForTimeout is not a function`
+**Solution** : Utiliser `new Promise(resolve => setTimeout(resolve, ms))` pour la compatibilité
 
-feedUrls: Array of FT.com RSS feeds to scrape.
-maxConcurrent: Number of concurrent browser instances (default: 4).
-limit: Maximum articles to scrape per run (default: 20).
-mongoUrl: MongoDB connection string (from .env).
-proxies: Array of proxy URLs (from .env).
-userAgents: Array of user-agents for rotation.
-extensionPath: Path to bypass-paywalls-chrome folder.
+**Problème** : Articles vides ou "No body"
+**Solution** : Ajuster les sélecteurs CSS dans `scrapeArticle()`
 
-Troubleshooting
-
-Cloudflare Blocks: Ensure FlareSolverr is running (docker ps) and proxies are configured. Test with a single URL.
-Paywall Issues: Verify the bypass-paywalls-chrome extension path and try alternative referrers (e.g., https://www.bing.com/).
-MongoDB Errors: Check connection string and ensure MongoDB is running.
-High Resource Usage: Reduce maxConcurrent in config.
-Selector Failures: FT.com may update selectors. Inspect articles in a browser and update .article__content-body, .story-body, etc., in scrapeArticle.
-
-Contributing
-Contributions are welcome! Please:
-
-Fork the repository.
-Create a feature branch (git checkout -b feature/your-feature).
-Commit changes (git commit -m 'Add your feature').
-Push to the branch (git push origin feature/your-feature).
-Open a pull request.
-
-License
-This project is licensed under the MIT License. See the LICENSE file for details.
-Disclaimer
-This project is for educational purposes only. Scraping FT.com may violate their terms of service or applicable laws. The author is not responsible for any misuse or legal consequences. Always seek permission from FT.com or use their official API for data access.
+**Problème** : Trop d'erreurs 429 (Rate limiting)
+**Solution** : Réduire `maxConcurrent` et ajouter plus de délais
