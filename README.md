@@ -1,26 +1,34 @@
 # Financial Times News Scraper
 
-Un scraper automatisé pour extraire et sauvegarder les articles du Financial Times à partir de leurs flux RSS. Le système utilise une approche de "swarm scraping" pour traiter plusieurs articles en parallèle tout en évitant la détection.
+---
+**Developer Information**
+- **Name**: [Hamid Bouargalne]
+- **Email**: [bouargalne.hamid@gmail.com]
+- **Phone**: [+y212 6 49 94 91 59]
+---
 
-## 📋 Fonctionnalités
+This README explores the functionalities of this program, as well as the interest of each method developed in the script, and also illustrates the explanation of execution processes and the results obtained.
 
-- **Scraping RSS** : Extraction automatique des URLs d'articles depuis les flux RSS du FT
-- **Scraping parallèle** : Traitement concurrent de plusieurs articles pour optimiser la vitesse
-- **Anti-détection** : Utilisation de Puppeteer Stealth et rotation d'user-agents
-- **Gestion des paywalls** : Tentative de contournement des overlays de paywall
-- **Sauvegarde multiple** : Export en JSON et CSV avec détection des doublons
-- **Planification** : Exécution automatique quotidienne via cron
-- **Gestion d'erreurs** : Retry automatique et logging des erreurs
+An automated scraper to extract and save Financial Times articles from their RSS feeds. The system uses a "swarm scraping" approach to process multiple articles in parallel while avoiding detection.
 
-## 🔧 Dépendances
+## Features
 
-### Dependencies principales
+- **RSS Scraping**: Automatic extraction of article URLs from FT RSS feeds
+- **Parallel Scraping**: Concurrent processing of multiple articles to optimize speed
+- **Anti-detection**: Use of Puppeteer Stealth and user-agent rotation
+- **Paywall Management**: Attempt to bypass paywall overlays
+- **Multiple Storage**: Export to JSON and CSV with duplicate detection
+- **Scheduling**: Automatic daily execution via cron
+- **Error Handling**: Automatic retry and error logging
+
+## 🔧 Dependencies
+
+### Main Dependencies
 ```json
 {
   "puppeteer-extra": "^3.3.6",
   "puppeteer-extra-plugin-stealth": "^2.11.2",
   "rss-parser": "^3.13.0",
-  "mongodb": "^6.0.0",
   "csv-writer": "^1.6.0",
   "node-cron": "^3.0.3"
 }
@@ -31,7 +39,7 @@ Un scraper automatisé pour extraire et sauvegarder les articles du Financial Ti
 npm install puppeteer-extra puppeteer-extra-plugin-stealth rss-parser mongodb csv-writer node-cron
 ```
 
-## 🏗️ Architecture et Fonctions
+## Architecture and Functions
 
 ### 1. Configuration (`config`)
 ```javascript
@@ -43,98 +51,101 @@ const config = {
   userAgents: [...]
 }
 ```
-**Intérêt** : Centralise tous les paramètres configurables (flux RSS, limite de concurrence, proxies, user-agents) pour faciliter la maintenance et les ajustements.
+**Interest**: Centralizes all configurable parameters (RSS feeds, concurrency limit, proxies, user-agents) to facilitate maintenance and adjustments.
 
-### 2. Lancement du navigateur (`launchBrowser`)
+### 2. Browser Launch (`launchBrowser`)
 ```javascript
 async function launchBrowser(proxy = null)
 ```
-**Étapes de traitement** :
-- Sélection aléatoire d'un user-agent
-- Configuration des arguments Puppeteer (sandbox, proxy)
-- Lancement en mode headless
+**Processing Steps**:
+- Random selection of a user-agent
+- Configuration of Puppeteer arguments (sandbox, proxy)
+- Launch in headless mode
 
-**Intérêt** : Initialise un navigateur configuré pour éviter la détection avec rotation d'user-agents et support proxy.
+**Interest**: Initializes a browser configured to avoid detection with user-agent rotation and proxy support.
 
-### 3. Scraping d'article (`scrapeArticle`)
+### 3. Article Scraping (`scrapeArticle`)
 ```javascript
 async function scrapeArticle(page, url, retries = 2)
 ```
-**Étapes de traitement** :
-1. Navigation vers l'URL avec timeout
-2. Suppression des éléments de paywall via JavaScript
-3. Attente pour le chargement du contenu
-4. Extraction des données (titre, corps, date, auteur)
-5. Retry automatique en cas d'échec
+**Processing Steps**:
+1. Navigate to URL with timeout
+2. Remove paywall elements via JavaScript
+3. Wait for content loading
+4. Extract data (title, body, date, author)
+5. Automatic retry on failure
 
-**Intérêt** : Fonction core qui extrait le contenu d'un article en gérant les obstacles (paywall, timeouts) avec un système de retry robuste.
+**Interest**: Core function that extracts article content while managing obstacles (paywall, timeouts) with a robust retry system.
 
-### 4. Récupération des URLs (`getArticleUrls`)
+### 4. URL Retrieval (`getArticleUrls`)
 ```javascript
 async function getArticleUrls(feeds = config.feedUrls, limit = config.limit)
 ```
-**Étapes de traitement** :
-1. Parse de chaque flux RSS
-2. Filtrage des articles du jour uniquement
-3. Limitation du nombre d'articles par flux
-4. Déduplication des URLs
+**Processing Steps**:
+1. Parse each RSS feed
+2. Filter today's articles only
+3. Limit number of articles per feed
+4. Deduplicate URLs
 
-**Intérêt** : Collecte intelligente des URLs à scraper en se concentrant sur le contenu récent et en évitant les doublons.
+**Interest**: Intelligent collection of URLs to scrape focusing on recent content and avoiding duplicates.
 
-### 5. Sauvegarde JSON (`saveToJson`)
+### 5. JSON Storage (`saveToJson`)
 ```javascript
 async function saveToJson(articles)
 ```
-**Étapes de traitement** :
-1. Lecture du fichier JSON existant
-2. Détection des articles déjà présents via URL
-3. Ajout uniquement des nouveaux articles
-4. Sauvegarde avec formatage
+**Processing Steps**:
+1. Read existing JSON file
+2. Detect already present articles via URL
+3. Add only new articles
+4. Save with formatting
 
-**Intérêt** : Maintient un historique complet en JSON tout en évitant la duplication de données.
+**Interest**: Maintains a complete history in JSON while avoiding data duplication.
 
-### 6. Sauvegarde CSV (`saveToCsv`)
+### 6. CSV Storage (`saveToCsv`)
 ```javascript
 async function saveToCsv(articles)
 ```
-**Étapes de traitement** :
-1. Configuration du writer CSV avec headers
-2. Lecture du CSV existant pour détecter les doublons
-3. Append des nouveaux articles uniquement
+**Processing Steps**:
+1. Configure CSV writer with headers
+2. Read existing CSV to detect duplicates
+3. Append new articles only
 
-**Intérêt** : Format CSV pour l'analyse de données et l'import dans des outils externes (Excel, BI tools).
+**Interest**: CSV format for data analysis and import into external tools (Excel, BI tools).
 
-### 7. Scraping en essaim (`swarmScrape`)
+### 7. Swarm Scraping (`swarmScrape`)
 ```javascript
 async function swarmScrape()
 ```
-**Étapes de traitement** :
-1. Lancement du navigateur avec proxy aléatoire
-2. Récupération de la liste des URLs à scraper
-3. Traitement par batches concurrents
-4. Création de pages multiples pour le parallélisme
-5. Exécution simultanée des scraping d'articles
-6. Fermeture propre des pages et du navigateur
-7. Sauvegarde des résultats
+**Processing Steps**:
+1. Launch browser with random proxy
+2. Retrieve list of URLs to scrape
+3. Process by concurrent batches
+4. Create multiple pages for parallelism
+5. Simultaneous execution of article scraping
+6. Proper closure of pages and browser
+7. Save results
 
-**Intérêt** : Orchestration complète du processus avec optimisation des performances via le traitement parallèle tout en respectant les limites du serveur.
+**Interest**: Complete process orchestration with performance optimization via parallel processing while respecting server limits.
 
-## 🚀 Utilisation
+## 🚀 Usage
 
-### Exécution manuelle
+### Manual Execution
 ```bash
 node scraper.js
 ```
 
-### Avec planificateur (recommandé)
+### With Scheduler
 ```bash
 node scheduler.js
 ```
-Le planificateur exécute le scraper quotidiennement à minuit UTC.
+The scheduler executes the scraper daily at midnight UTC.
 
-## 📁 Structure des données
+## Data Structure
 
-### Format JSON
+### JSON Format
+
+The results will be stored in a JSON file, in this format:
+
 ```json
 {
   "url": "https://www.ft.com/content/...",
@@ -145,15 +156,18 @@ Le planificateur exécute le scraper quotidiennement à minuit UTC.
 }
 ```
 
-### Format CSV
+### CSV Format
+
+As I have added the option to store them in CSV format, in this form:
+
 ```csv
 URL,Title,Body,Date,Author
 https://www.ft.com/content/...,Article Title,Full content...,Date,Author
 ```
 
-## ⚙️ Configuration avancée
+## Advanced Configuration
 
-### Ajout de proxies
+### Adding Proxies
 ```javascript
 proxies: [
   'http://user:pass@proxy1:8080',
@@ -162,7 +176,7 @@ proxies: [
 ]
 ```
 
-### Modification des flux RSS
+### Modifying RSS Feeds
 ```javascript
 feedUrls: [
   'https://www.ft.com/world?format=rss',
@@ -171,32 +185,15 @@ feedUrls: [
 ]
 ```
 
-### Ajustement de la concurrence
-```javascript
-maxConcurrent: 3 // Réduire pour des sites plus sensibles
-```
+##  Results and Screenshots
 
-## 📝 Logs et monitoring
+After launching the scheduler.js script, we obtain the results perfectly as desired, as illustrated in the following figures:
 
-- Logs de progression en temps réel
-- Sauvegarde des erreurs dans `errors.log`
-- Compteurs de nouveaux articles sauvegardés
-- Retry automatique avec logging des tentatives
+### Scraper Execution in Action
+![Scraper running](screenshot1.png)
+*The scraper processes RSS feeds and scrapes articles by batches to optimize performance*
 
-## ⚠️ Avertissements
+### Extracted Data - JSON Format
+![JSON file preview](screenshot2.png)
+*Clear data structure with all extracted fields (URL, title, content, date, author)*
 
-- Respectez les conditions d'utilisation du Financial Times
-- Utilisez des délais appropriés pour éviter la surcharge des serveurs
-- Testez avec des limites faibles avant le déploiement en production
-- Le contournement de paywall peut violer les ToS du site
-
-## 🔍 Troubleshooting
-
-**Problème** : `waitForTimeout is not a function`
-**Solution** : Utiliser `new Promise(resolve => setTimeout(resolve, ms))` pour la compatibilité
-
-**Problème** : Articles vides ou "No body"
-**Solution** : Ajuster les sélecteurs CSS dans `scrapeArticle()`
-
-**Problème** : Trop d'erreurs 429 (Rate limiting)
-**Solution** : Réduire `maxConcurrent` et ajouter plus de délais
