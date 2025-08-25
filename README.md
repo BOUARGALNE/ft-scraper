@@ -2,9 +2,9 @@
 
 ---
 **Developer Information**
-- **Name**: [Hamid Bouargalne]
-- **Email**: [bouargalne.hamid@gmail.com]
-- **Phone**: [+y212 6 49 94 91 59]
+- **Name**: Hamid Bouargalne
+- **Email**: bouargalne.hamid@gmail.com
+- **Phone**: +212 6 49 94 91 59
 ---
 
 This README explores the functionalities of this program, as well as the interest of each method developed in the script, and also illustrates the explanation of execution processes and the results obtained.
